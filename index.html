@@ -57,18 +57,35 @@
       background: var(--surface2); padding: 3px 8px; border-radius: 20px;
     }
 
-    /* Video embed */
-    .video-wrap {
+    /* Thumbnail player */
+    .thumb-player {
       background: #000; position: relative;
       width: 100%; aspect-ratio: 16/9;
-      flex-shrink: 0; max-height: 35vh;
+      flex-shrink: 0; max-height: 40vh;
+      cursor: pointer; overflow: hidden;
     }
-    .video-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
-    .mute-hint {
-      position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.65); color: #ccc; font-size: 11px;
-      padding: 3px 10px; border-radius: 20px; white-space: nowrap;
-      pointer-events: none; z-index: 5;
+    .thumb-player img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      transition: transform 0.25s;
+    }
+    .thumb-player:active img { transform: scale(1.04); }
+    .play-btn-overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; background: rgba(0,0,0,0.28);
+    }
+    .play-circle {
+      width: 68px; height: 68px; border-radius: 50%;
+      background: rgba(220,0,0,0.9);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      transition: transform 0.15s, background 0.15s;
+    }
+    .thumb-player:active .play-circle { transform: scale(0.88); background: #c00; }
+    .play-circle svg { width: 30px; height: 30px; fill: white; margin-left: 5px; }
+    .play-hint {
+      font-size: 12px; color: rgba(255,255,255,0.9); font-weight: 600;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.9); letter-spacing: 0.04em;
     }
     .video-overlay {
       position: absolute; inset: 0;
@@ -76,6 +93,13 @@
       background: rgba(13,13,26,0.92); flex-direction: column; gap: 12px; z-index: 2;
     }
     .video-overlay.hidden { display: none; }
+    /* Embed info */
+    .embed-info-box {
+      background: var(--surface); border-radius: var(--radius); padding: 14px 16px;
+      display: flex; gap: 12px; align-items: flex-start;
+      font-size: 13px; color: var(--text-muted); line-height: 1.55;
+    }
+    .embed-info-icon { font-size: 22px; flex-shrink: 0; }
     .spinner {
       width: 40px; height: 40px;
       border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent);
@@ -163,39 +187,6 @@
       padding: 12px 16px; overflow-y: auto; gap: 10px;
     }
 
-    /* Speed */
-    .speed-section { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
-    .speed-label {
-      font-size: 13px; color: var(--text-muted); margin-bottom: 10px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .speed-label .speed-val { font-size: 20px; font-weight: 700; color: var(--accent); }
-    #speedSlider {
-      width: 100%; margin-bottom: 12px; --pct: 50%;
-      background: linear-gradient(to right, var(--accent) var(--pct), var(--surface2) var(--pct));
-      height: 8px; -webkit-appearance: none; appearance: none;
-      border-radius: 4px; outline: none; cursor: pointer;
-    }
-    #speedSlider::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 24px; height: 24px;
-      border-radius: 50%; background: var(--accent); cursor: pointer;
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-    #speedSlider::-moz-range-thumb {
-      width: 24px; height: 24px; border-radius: 50%;
-      background: var(--accent); border: none; cursor: pointer;
-    }
-    .speed-presets { display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn-speed {
-      flex: 1; min-width: 48px; background: var(--surface2); color: var(--text-muted);
-      border: 1px solid transparent; border-radius: 8px; padding: 10px 4px;
-      font-size: 14px; font-weight: 600; cursor: pointer; text-align: center;
-      transition: all 0.15s; touch-action: manipulation;
-    }
-    .btn-speed.active { background: rgba(168,85,247,0.15); border-color: var(--accent); color: var(--accent); }
-    .btn-speed[data-speed="1.0"] { background: rgba(76,175,80,0.14); border-color: rgba(76,175,80,0.5); color: #6fcf74; }
-    .btn-speed[data-speed="1.0"].active { background: rgba(76,175,80,0.22); border-color: #5cd65c; color: #5cd65c; }
-    .btn-speed:active { opacity: 0.7; }
 
     /* Lists */
     .section-header {
@@ -284,9 +275,14 @@
   </div>
 </header>
 
-<div class="video-wrap">
-  <iframe id="ytFrame" src="" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" title="EverlastAI Video"></iframe>
-  <div class="mute-hint" id="muteHint">🔇 Stummgeschaltet — Ton im Player aktivieren</div>
+<div class="thumb-player" id="thumbPlayer">
+  <img id="thumbImg" src="" alt="">
+  <div class="play-btn-overlay">
+    <div class="play-circle">
+      <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+    </div>
+    <div class="play-hint">Auf YouTube ansehen ↗</div>
+  </div>
   <div class="video-overlay" id="overlay">
     <div class="spinner" id="spinner"></div>
     <div class="overlay-msg" id="overlayMsg">Lade Videos…</div>
@@ -324,7 +320,7 @@
 
 <!-- Tab bar -->
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="player"><span class="tab-icon">▶</span>Player</button>
+  <button class="tab-btn active" data-tab="player"><span class="tab-icon">ℹ️</span>Info</button>
   <button class="tab-btn" data-tab="starred"><span class="tab-icon">⭐</span>Gemerkt</button>
   <button class="tab-btn" data-tab="unseen"><span class="tab-icon">👁</span>Ungesehen</button>
   <button class="tab-btn" data-tab="settings"><span class="tab-icon">⚙️</span>Info</button>
@@ -332,22 +328,10 @@
 
 <!-- Tab: Player -->
 <div class="tab-panel active controls" id="panelPlayer">
-  <div class="speed-section">
-    <div class="speed-label">
-      <span>Wiedergabe&shy;geschwindigkeit</span>
-      <span class="speed-val" id="speedVal">1.0×</span>
-    </div>
-    <input type="range" id="speedSlider" min="0.5" max="2.5" step="0.05" value="1.0">
-    <div class="speed-presets">
-      <button class="btn-speed" data-speed="0.5">0.5×</button>
-      <button class="btn-speed" data-speed="0.75">0.75×</button>
-      <button class="btn-speed active" data-speed="1.0">1.0×</button>
-      <button class="btn-speed" data-speed="1.25">1.25×</button>
-      <button class="btn-speed" data-speed="1.5">1.5×</button>
-      <button class="btn-speed" data-speed="1.75">1.75×</button>
-      <button class="btn-speed" data-speed="2.0">2.0×</button>
-      <button class="btn-speed" data-speed="2.5">2.5×</button>
-    </div>
+  <div class="embed-info-box">
+    <div class="embed-info-icon">ℹ️</div>
+    <div>YouTube-Einbettung ist für diesen Kanal deaktiviert.<br>
+    Klick auf das Thumbnail oder <strong>▶ YouTube</strong> öffnet das Video direkt — Gesehen- und Gemerkt-Status werden trotzdem gespeichert.</div>
   </div>
   <div class="error-box" id="errorBox">
     <div id="errorMsg"></div>
@@ -419,7 +403,6 @@
   // ── Storage keys ──────────────────────────────────────────────────────────
   const KEY_SEEN    = 'everlastai_seen';
   const KEY_STARRED = 'everlastai_starred';
-  const KEY_SPEED   = 'everlastai_speed';
   const KEY_INDEX   = 'everlastai_index';
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -430,7 +413,8 @@
   let activeInstance = '';
 
   // ── DOM ───────────────────────────────────────────────────────────────────
-  const ytFrame      = document.getElementById('ytFrame');
+  const thumbPlayer  = document.getElementById('thumbPlayer');
+  const thumbImg     = document.getElementById('thumbImg');
   const overlay      = document.getElementById('overlay');
   const overlayMsg   = document.getElementById('overlayMsg');
   const spinner      = document.getElementById('spinner');
@@ -447,9 +431,6 @@
   const btnOlder     = document.getElementById('btnOlder');
   const btnNewer     = document.getElementById('btnNewer');
   const btnLatest    = document.getElementById('btnLatest');
-  const speedSlider  = document.getElementById('speedSlider');
-  const speedVal     = document.getElementById('speedVal');
-  const speedBtns    = document.querySelectorAll('.btn-speed');
   const errorBox     = document.getElementById('errorBox');
   const errorMsg     = document.getElementById('errorMsg');
   const btnRetry     = document.getElementById('btnRetry');
@@ -478,45 +459,20 @@
   }
   function saveSeen()    { try { localStorage.setItem(KEY_SEEN,    JSON.stringify(seen));    } catch(e) {} }
   function saveStarred() { try { localStorage.setItem(KEY_STARRED, JSON.stringify(starred)); } catch(e) {} }
-  function saveSpeed(s)  { try { localStorage.setItem(KEY_SPEED, String(s)); } catch(e) {} }
-  function loadSpeed()   { try { return parseFloat(localStorage.getItem(KEY_SPEED)) || 1.0; } catch(e) { return 1.0; } }
   function saveIndex(i)  { try { localStorage.setItem(KEY_INDEX, String(i)); } catch(e) {} }
   function loadIndex()   { try { return parseInt(localStorage.getItem(KEY_INDEX)) || 0; } catch(e) { return 0; } }
 
-  // ── Speed ─────────────────────────────────────────────────────────────────
-  function sendSpeedToYT(spd) {
-    try {
-      ytFrame.contentWindow?.postMessage(JSON.stringify({
-        event: 'command', func: 'setPlaybackRate', args: [spd]
-      }), '*');
-    } catch {}
+  function openCurrentOnYT() {
+    const v = currentVideo(); if (!v) return;
+    window.open('https://www.youtube.com/watch?v=' + v.id, '_blank');
+    if (!seen[v.id]) {
+      seen[v.id] = true;
+      saveSeen(); renderCurrent();
+      showToast('▶ YouTube geöffnet — als gesehen markiert');
+    } else {
+      showToast('▶ Auf YouTube geöffnet');
+    }
   }
-
-  function applySpeed(spd) {
-    spd = Math.min(2.5, Math.max(0.5, spd));
-    speedSlider.value = spd;
-    const pct = ((spd - 0.5) / 2.0) * 100;
-    speedSlider.style.setProperty('--pct', pct + '%');
-    const disp = Number.isInteger(spd) ? spd + '×' : spd.toFixed(2).replace(/\.?0+$/,'') + '×';
-    speedVal.textContent = disp;
-    speedBtns.forEach(b => b.classList.toggle('active', Math.abs(parseFloat(b.dataset.speed) - spd) < 0.01));
-    sendSpeedToYT(spd);
-    saveSpeed(spd);
-  }
-
-  // YouTube IFrame API events (speed after ready, detect embedding blocked)
-  window.addEventListener('message', e => {
-    if (!e.data) return;
-    try {
-      const d = JSON.parse(typeof e.data === 'string' ? e.data : '{}');
-      if (d.event === 'initialDelivery' || d.event === 'infoDelivery') {
-        sendSpeedToYT(parseFloat(speedSlider.value));
-      }
-      // playerState 5 = video cued (embedding might be blocked if it stays here)
-    } catch {}
-  });
-  speedSlider.addEventListener('input', () => applySpeed(parseFloat(speedSlider.value)));
-  speedBtns.forEach(b => b.addEventListener('click', () => applySpeed(parseFloat(b.dataset.speed))));
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -539,11 +495,8 @@
     const v = currentVideo();
     if (!v) return;
 
-    ytFrame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&mute=1&rel=0&modestbranding=1&enablejsapi=1`;
+    thumbImg.src = v.thumbnail;
     overlay.classList.add('hidden');
-    // Apply saved speed once the IFrame API is ready (via postMessage)
-    clearTimeout(ytFrame._speedTimer);
-    ytFrame._speedTimer = setTimeout(() => sendSpeedToYT(parseFloat(speedSlider.value)), 2000);
 
     videoTitle.textContent = v.title;
     videoDate.textContent  = formatDate(v.publishedAt);
@@ -591,10 +544,8 @@
     showToast(starred[v.id] ? '⭐ Gemerkt!' : 'Merker entfernt');
   });
 
-  btnYT.addEventListener('click', () => {
-    const v = currentVideo(); if (!v) return;
-    window.open('https://www.youtube.com/watch?v=' + v.id, '_blank');
-  });
+  thumbPlayer.addEventListener('click', openCurrentOnYT);
+  btnYT.addEventListener('click', openCurrentOnYT);
 
   // ── List rendering ────────────────────────────────────────────────────────
   function makeListItem(v, idx) {
