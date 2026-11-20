@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a0a3d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EverlastAI">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>EverlastAI Player</title>
+  <style>
+    :root {
+      --bg: #0d0d1a;
+      --surface: #161628;
+      --surface2: #1e1e38;
+      --accent: #a855f7;
+      --accent2: #7c3aed;
+      --accent-glow: rgba(168,85,247,0.25);
+      --text: #f0eeff;
+      --text-muted: #8880aa;
+      --seen-color: #22c55e;
+      --star-color: #f59e0b;
+      --radius: 14px;
+      --btn-bg: #1e1e38;
+      --btn-hover: #2a2a4a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, #1a0a3d 0%, #0d0d2a 100%);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 2px solid var(--accent);
+      flex-shrink: 0;
+    }
+    .logo { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
+    header h1 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .video-count-badge {
+      font-size: 11px; color: var(--text-muted);
+      background: var(--surface2); padding: 3px 8px; border-radius: 20px;
+    }
+
+    /* Video embed */
+    .video-wrap {
+      background: #000; position: relative;
+      width: 100%; aspect-ratio: 16/9;
+      flex-shrink: 0; max-height: 35vh;
+    }
+    .video-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+    .video-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(13,13,26,0.92); flex-direction: column; gap: 12px; z-index: 2;
+    }
+    .video-overlay.hidden { display: none; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overlay-msg { font-size: 13px; color: var(--text-muted); text-align: center; padding: 0 20px; }
+
+    /* Video info bar */
+    .video-info {
+      background: var(--surface); padding: 8px 14px;
+      flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .video-title-text {
+      font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.4;
+    }
+    .video-meta {
+      font-size: 11px; color: var(--text-muted); margin-top: 3px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .badge-seen {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+      background: rgba(34,197,94,0.12); color: var(--seen-color);
+      border: 1px solid rgba(34,197,94,0.3); white-space: nowrap; flex-shrink: 0;
+    }
+    .badge-seen.hidden { display: none; }
+
+    .action-row { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-mark {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 9px 12px; border: none; border-radius: 10px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; touch-action: manipulation;
+    }
+    .btn-mark-seen {
+      background: rgba(34,197,94,0.12); color: var(--seen-color);
+      border: 1px solid rgba(34,197,94,0.3);
+    }
+    .btn-mark-seen.active { background: rgba(34,197,94,0.22); border-color: var(--seen-color); }
+    .btn-mark-seen:active { transform: scale(0.95); }
+    .btn-mark-star {
+      background: rgba(245,158,11,0.1); color: var(--star-color);
+      border: 1px solid rgba(245,158,11,0.3);
+    }
+    .btn-mark-star.active { background: rgba(245,158,11,0.22); border-color: var(--star-color); }
+    .btn-mark-star:active { transform: scale(0.95); }
+    .btn-open-yt {
+      background: rgba(255,0,0,0.1); color: #ff4444;
+      border: 1px solid rgba(255,0,0,0.25);
+      flex: 0 0 auto; padding: 9px 14px;
+    }
+    .btn-open-yt:active { transform: scale(0.95); }
+
+    /* Navigation */
+    .nav-bar {
+      background: var(--surface); display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .btn-nav {
+      background: var(--btn-bg); color: var(--text); border: none; border-radius: 10px;
+      width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
+    }
+    .btn-nav:active { background: var(--btn-hover); transform: scale(0.93); }
+    .btn-nav:disabled { opacity: 0.3; cursor: default; transform: none; }
+    .nav-info {
+      flex: 1; background: var(--btn-bg); border-radius: 10px; padding: 8px 12px; text-align: center;
+    }
+    .nav-info .nav-index { font-size: 14px; font-weight: 700; color: var(--accent); }
+    .nav-info .nav-hint  { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+    .btn-nav-latest {
+      background: var(--accent); color: white; border: none; border-radius: 10px;
+      padding: 0 12px; height: 44px; font-size: 12px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; flex-shrink: 0; white-space: nowrap;
+      transition: background 0.15s, transform 0.1s; touch-action: manipulation;
+    }
+    .btn-nav-latest:active { background: var(--accent2); transform: scale(0.95); }
+    .btn-nav-latest:disabled { opacity: 0.5; cursor: default; }
+
+    /* Controls */
+    .controls {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 12px 16px; overflow-y: auto; gap: 10px;
+    }
+
+    /* Speed */
+    .speed-section { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
+    .speed-label {
+      font-size: 13px; color: var(--text-muted); margin-bottom: 10px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .speed-label .speed-val { font-size: 20px; font-weight: 700; color: var(--accent); }
+    #speedSlider {
+      width: 100%; margin-bottom: 12px; --pct: 50%;
+      background: linear-gradient(to right, var(--accent) var(--pct), var(--surface2) var(--pct));
+      height: 8px; -webkit-appearance: none; appearance: none;
+      border-radius: 4px; outline: none; cursor: pointer;
+    }
+    #speedSlider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 24px; height: 24px;
+      border-radius: 50%; background: var(--accent); cursor: pointer;
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    #speedSlider::-moz-range-thumb {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--accent); border: none; cursor: pointer;
+    }
+    .speed-presets { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-speed {
+      flex: 1; min-width: 48px; background: var(--surface2); color: var(--text-muted);
+      border: 1px solid transparent; border-radius: 8px; padding: 10px 4px;
+      font-size: 14px; font-weight: 600; cursor: pointer; text-align: center;
+      transition: all 0.15s; touch-action: manipulation;
+    }
+    .btn-speed.active { background: rgba(168,85,247,0.15); border-color: var(--accent); color: var(--accent); }
+    .btn-speed[data-speed="1.0"] { background: rgba(76,175,80,0.14); border-color: rgba(76,175,80,0.5); color: #6fcf74; }
+    .btn-speed[data-speed="1.0"].active { background: rgba(76,175,80,0.22); border-color: #5cd65c; color: #5cd65c; }
+    .btn-speed:active { opacity: 0.7; }
+
+    /* Lists */
+    .section-header {
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .video-list { display: flex; flex-direction: column; gap: 6px; }
+    .video-list-item {
+      background: var(--surface); border-radius: 10px; padding: 10px 12px;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      transition: background 0.15s; border: 1px solid transparent; touch-action: manipulation;
+    }
+    .video-list-item:active { background: var(--btn-hover); }
+    .video-list-item.current { border-color: var(--accent); background: rgba(168,85,247,0.08); }
+    .video-list-item .item-thumb {
+      width: 56px; height: 32px; border-radius: 6px; background: var(--surface2);
+      object-fit: cover; flex-shrink: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 18px;
+    }
+    .video-list-item .item-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+    .video-list-item .item-info { flex: 1; min-width: 0; }
+    .video-list-item .item-title { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .video-list-item .item-date { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .video-list-item .item-icons { display: flex; gap: 4px; flex-shrink: 0; }
+    .item-icon { font-size: 14px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: calc(env(safe-area-inset-bottom,0px) + 16px);
+      left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.85); color: var(--text); font-size: 13px;
+      padding: 8px 18px; border-radius: 20px; pointer-events: none;
+      opacity: 0; transition: opacity 0.3s; white-space: nowrap; z-index: 100;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Error */
+    .error-box {
+      background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.3);
+      border-radius: var(--radius); padding: 14px; font-size: 13px; color: #c084fc;
+      text-align: center; display: none;
+    }
+    .error-box.show { display: block; }
+    .btn-retry {
+      margin-top: 10px; background: var(--accent); color: white; border: none;
+      border-radius: 8px; padding: 8px 20px; font-size: 14px; cursor: pointer;
+    }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex; background: var(--surface);
+      border-top: 1px solid rgba(255,255,255,0.05); flex-shrink: 0;
+    }
+    .tab-btn {
+      flex: 1; background: none; border: none; color: var(--text-muted);
+      font-size: 11px; font-weight: 600; padding: 10px 4px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: color 0.15s; touch-action: manipulation;
+    }
+    .tab-btn .tab-icon { font-size: 18px; }
+    .tab-btn.active { color: var(--accent); }
+    .tab-btn:active { opacity: 0.7; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: flex; flex-direction: column; }
+    .tab-panel.active.controls { flex: 1; }
+
+    /* Instance info */
+    .instance-info {
+      background: var(--surface); border-radius: var(--radius); padding: 12px 14px;
+      font-size: 12px; color: var(--text-muted); line-height: 1.6;
+    }
+    .instance-info strong { color: var(--text); }
+
+    .empty-state { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 13px; }
+    .empty-state .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="icon-192.png" class="logo" alt="EverlastAI">
+  <h1>EverlastAI Player</h1>
+  <div class="header-right">
+    <span class="video-count-badge" id="videosTotal">Lade…</span>
+  </div>
+</header>
+
+<div class="video-wrap">
+  <iframe id="ytFrame" src="" allowfullscreen allow="autoplay; encrypted-media" title="EverlastAI Video"></iframe>
+  <div class="video-overlay" id="overlay">
+    <div class="spinner" id="spinner"></div>
+    <div class="overlay-msg" id="overlayMsg">Lade Videos…</div>
+  </div>
+</div>
+
+<!-- Video info -->
+<div class="video-info">
+  <div class="video-title-text" id="videoTitle">–</div>
+  <div class="video-meta">
+    <span id="videoDate">–</span>
+    <span id="badgeSeen" class="badge-seen hidden">✓ Gesehen</span>
+  </div>
+  <div class="action-row">
+    <button class="btn-mark btn-mark-seen" id="btnSeen">
+      <span>👁</span> <span id="seenLabel">Gesehen</span>
+    </button>
+    <button class="btn-mark btn-mark-star" id="btnStar">
+      <span>⭐</span> <span id="starLabel">Merken</span>
+    </button>
+    <button class="btn-mark btn-open-yt" id="btnYT">▶ YT</button>
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav-bar">
+  <button class="btn-nav" id="btnOlder" title="Ältere Folge">◀</button>
+  <div class="nav-info">
+    <div class="nav-index" id="navIndex">– / –</div>
+    <div class="nav-hint">neueste → ältere</div>
+  </div>
+  <button class="btn-nav" id="btnNewer" title="Neuere Folge">▶</button>
+  <button class="btn-nav-latest" id="btnLatest">⚡ Neueste</button>
+</div>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="player"><span class="tab-icon">▶</span>Player</button>
+  <button class="tab-btn" data-tab="starred"><span class="tab-icon">⭐</span>Gemerkt</button>
+  <button class="tab-btn" data-tab="unseen"><span class="tab-icon">👁</span>Ungesehen</button>
+  <button class="tab-btn" data-tab="settings"><span class="tab-icon">⚙️</span>Info</button>
+</div>
+
+<!-- Tab: Player -->
+<div class="tab-panel active controls" id="panelPlayer">
+  <div class="speed-section">
+    <div class="speed-label">
+      <span>Wiedergabe&shy;geschwindigkeit</span>
+      <span class="speed-val" id="speedVal">1.0×</span>
+    </div>
+    <input type="range" id="speedSlider" min="0.5" max="2.5" step="0.05" value="1.0">
+    <div class="speed-presets">
+      <button class="btn-speed" data-speed="0.5">0.5×</button>
+      <button class="btn-speed" data-speed="0.75">0.75×</button>
+      <button class="btn-speed active" data-speed="1.0">1.0×</button>
+      <button class="btn-speed" data-speed="1.25">1.25×</button>
+      <button class="btn-speed" data-speed="1.5">1.5×</button>
+      <button class="btn-speed" data-speed="1.75">1.75×</button>
+      <button class="btn-speed" data-speed="2.0">2.0×</button>
+      <button class="btn-speed" data-speed="2.5">2.5×</button>
+    </div>
+  </div>
+  <div class="error-box" id="errorBox">
+    <div id="errorMsg"></div>
+    <button class="btn-retry" id="btnRetry">Erneut versuchen</button>
+  </div>
+</div>
+
+<!-- Tab: Starred -->
+<div class="tab-panel controls" id="panelStarred">
+  <div class="section-header">
+    <span>⭐ Gemerkte Videos</span>
+    <span id="starredCount" style="font-size:11px;font-weight:400;text-transform:none"></span>
+  </div>
+  <div class="video-list" id="starredList">
+    <div class="empty-state"><div class="empty-icon">⭐</div>Noch keine Videos gemerkt.</div>
+  </div>
+</div>
+
+<!-- Tab: Unseen -->
+<div class="tab-panel controls" id="panelUnseen">
+  <div class="section-header">
+    <span>👁 Ungesehene Videos</span>
+    <span id="unseenCount" style="font-size:11px;font-weight:400;text-transform:none"></span>
+  </div>
+  <div class="video-list" id="unseenList">
+    <div class="empty-state"><div class="empty-icon">🎉</div>Alle geladenen Videos gesehen!</div>
+  </div>
+</div>
+
+<!-- Tab: Info -->
+<div class="tab-panel controls" id="panelSettings">
+  <div class="instance-info">
+    <strong>Datenquelle</strong><br>
+    Videos werden über die freie <strong>Invidious-API</strong> geladen — kein API-Key, kein Google-Konto nötig.<br><br>
+    <strong>Kanal:</strong> Everlast AI (UC8T5gQ4U4GbI2h8kYCkEcvg)<br>
+    <strong>Aktive Instanz:</strong> <span id="activeInstance">–</span>
+  </div>
+  <div class="section-header" style="margin-top:16px;">Daten zurücksetzen</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button id="btnResetSeen" style="flex:1;background:var(--surface2);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">
+      🗑 Gesehen-Liste leeren
+    </button>
+    <button id="btnResetStars" style="flex:1;background:var(--surface2);color:var(--text-muted);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">
+      🗑 Gemerkte leeren
+    </button>
+  </div>
+  <div style="margin-top:16px;font-size:12px;color:var(--text-muted);">EverlastAI Player v1.1 — kein API-Key erforderlich</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Channel ───────────────────────────────────────────────────────────────
+  const CHANNEL_ID = 'UC8T5gQ4U4GbI2h8kYCkEcvg';
+
+  // Invidious public instances — tried in order until one works
+  const INSTANCES = [
+    'https://invidious.io',
+    'https://inv.nadeko.net',
+    'https://invidious.nerdvpn.de',
+    'https://yewtu.be',
+    'https://vid.puffyan.us',
+    'https://invidious.slipfox.xyz',
+  ];
+
+  // ── Storage keys ──────────────────────────────────────────────────────────
+  const KEY_SEEN    = 'everlastai_seen';
+  const KEY_STARRED = 'everlastai_starred';
+  const KEY_SPEED   = 'everlastai_speed';
+  const KEY_INDEX   = 'everlastai_index';
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let videos     = [];
+  let currentIdx = 0;
+  let seen       = {};
+  let starred    = {};
+  let activeInstance = '';
+
+  // ── DOM ───────────────────────────────────────────────────────────────────
+  const ytFrame      = document.getElementById('ytFrame');
+  const overlay      = document.getElementById('overlay');
+  const overlayMsg   = document.getElementById('overlayMsg');
+  const spinner      = document.getElementById('spinner');
+  const videoTitle   = document.getElementById('videoTitle');
+  const videoDate    = document.getElementById('videoDate');
+  const badgeSeen    = document.getElementById('badgeSeen');
+  const btnSeen      = document.getElementById('btnSeen');
+  const seenLabel    = document.getElementById('seenLabel');
+  const btnStar      = document.getElementById('btnStar');
+  const starLabel    = document.getElementById('starLabel');
+  const btnYT        = document.getElementById('btnYT');
+  const navIndex     = document.getElementById('navIndex');
+  const videosTotal  = document.getElementById('videosTotal');
+  const btnOlder     = document.getElementById('btnOlder');
+  const btnNewer     = document.getElementById('btnNewer');
+  const btnLatest    = document.getElementById('btnLatest');
+  const speedSlider  = document.getElementById('speedSlider');
+  const speedVal     = document.getElementById('speedVal');
+  const speedBtns    = document.querySelectorAll('.btn-speed');
+  const errorBox     = document.getElementById('errorBox');
+  const errorMsg     = document.getElementById('errorMsg');
+  const btnRetry     = document.getElementById('btnRetry');
+  const toast        = document.getElementById('toast');
+  const starredList  = document.getElementById('starredList');
+  const unseenList   = document.getElementById('unseenList');
+  const starredCount = document.getElementById('starredCount');
+  const unseenCount  = document.getElementById('unseenCount');
+  const btnResetSeen = document.getElementById('btnResetSeen');
+  const btnResetStars= document.getElementById('btnResetStars');
+  const activeInstanceEl = document.getElementById('activeInstance');
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, ms = 2000) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), ms);
+  }
+
+  // ── Persistence ───────────────────────────────────────────────────────────
+  function load() {
+    try { seen    = JSON.parse(localStorage.getItem(KEY_SEEN)    || '{}'); } catch(e) { seen = {}; }
+    try { starred = JSON.parse(localStorage.getItem(KEY_STARRED) || '{}'); } catch(e) { starred = {}; }
+  }
+  function saveSeen()    { try { localStorage.setItem(KEY_SEEN,    JSON.stringify(seen));    } catch(e) {} }
+  function saveStarred() { try { localStorage.setItem(KEY_STARRED, JSON.stringify(starred)); } catch(e) {} }
+  function saveSpeed(s)  { try { localStorage.setItem(KEY_SPEED, String(s)); } catch(e) {} }
+  function loadSpeed()   { try { return parseFloat(localStorage.getItem(KEY_SPEED)) || 1.0; } catch(e) { return 1.0; } }
+  function saveIndex(i)  { try { localStorage.setItem(KEY_INDEX, String(i)); } catch(e) {} }
+  function loadIndex()   { try { return parseInt(localStorage.getItem(KEY_INDEX)) || 0; } catch(e) { return 0; } }
+
+  // ── Speed ─────────────────────────────────────────────────────────────────
+  function applySpeed(spd) {
+    spd = Math.min(2.5, Math.max(0.5, spd));
+    speedSlider.value = spd;
+    const pct = ((spd - 0.5) / 2.0) * 100;
+    speedSlider.style.setProperty('--pct', pct + '%');
+    const disp = Number.isInteger(spd) ? spd + '×' : spd.toFixed(2).replace(/\.?0+$/,'') + '×';
+    speedVal.textContent = disp;
+    speedBtns.forEach(b => b.classList.toggle('active', Math.abs(parseFloat(b.dataset.speed) - spd) < 0.01));
+    saveSpeed(spd);
+  }
+  speedSlider.addEventListener('input', () => applySpeed(parseFloat(speedSlider.value)));
+  speedBtns.forEach(b => b.addEventListener('click', () => applySpeed(parseFloat(b.dataset.speed))));
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.tab-panel').forEach(p => {
+        const id = 'panel' + tab.charAt(0).toUpperCase() + tab.slice(1);
+        p.classList.toggle('active', p.id === id);
+      });
+      if (tab === 'starred') renderStarredList();
+      if (tab === 'unseen')  renderUnseenList();
+    });
+  });
+
+  // ── Current video ─────────────────────────────────────────────────────────
+  function currentVideo() { return videos[currentIdx] || null; }
+
+  function renderCurrent() {
+    const v = currentVideo();
+    if (!v) return;
+
+    ytFrame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&rel=0&modestbranding=1`;
+    overlay.classList.add('hidden');
+
+    videoTitle.textContent = v.title;
+    videoDate.textContent  = formatDate(v.publishedAt);
+
+    const isSeen = !!seen[v.id];
+    badgeSeen.classList.toggle('hidden', !isSeen);
+    btnSeen.classList.toggle('active', isSeen);
+    seenLabel.textContent = isSeen ? 'Gesehen ✓' : 'Gesehen';
+
+    const isStarred = !!starred[v.id];
+    btnStar.classList.toggle('active', isStarred);
+    starLabel.textContent = isStarred ? 'Gemerkt ⭐' : 'Merken';
+
+    navIndex.textContent   = `${currentIdx + 1} / ${videos.length}`;
+    btnOlder.disabled      = currentIdx >= videos.length - 1;
+    btnNewer.disabled      = currentIdx <= 0;
+    btnLatest.disabled     = currentIdx === 0;
+
+    saveIndex(currentIdx);
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '–';
+    const d = new Date(iso);
+    return d.toLocaleDateString('de-DE', { day:'numeric', month:'long', year:'numeric' });
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  btnOlder.addEventListener('click', () => { if (currentIdx < videos.length - 1) { currentIdx++; renderCurrent(); } });
+  btnNewer.addEventListener('click', () => { if (currentIdx > 0) { currentIdx--; renderCurrent(); } });
+  btnLatest.addEventListener('click', () => { currentIdx = 0; renderCurrent(); showToast('⚡ Neuestes Video'); });
+
+  // ── Mark buttons ──────────────────────────────────────────────────────────
+  btnSeen.addEventListener('click', () => {
+    const v = currentVideo(); if (!v) return;
+    seen[v.id] ? delete seen[v.id] : (seen[v.id] = true);
+    saveSeen(); renderCurrent();
+    showToast(seen[v.id] ? '✓ Als gesehen markiert' : 'Als ungesehen markiert');
+  });
+
+  btnStar.addEventListener('click', () => {
+    const v = currentVideo(); if (!v) return;
+    starred[v.id] ? delete starred[v.id] : (starred[v.id] = true);
+    saveStarred(); renderCurrent();
+    showToast(starred[v.id] ? '⭐ Gemerkt!' : 'Merker entfernt');
+  });
+
+  btnYT.addEventListener('click', () => {
+    const v = currentVideo(); if (!v) return;
+    window.open('https://www.youtube.com/watch?v=' + v.id, '_blank');
+  });
+
+  // ── List rendering ────────────────────────────────────────────────────────
+  function makeListItem(v, idx) {
+    const item = document.createElement('div');
+    item.className = 'video-list-item' + (idx === currentIdx ? ' current' : '');
+    const isSeen    = !!seen[v.id];
+    const isStarred = !!starred[v.id];
+    item.innerHTML = `
+      <div class="item-thumb">
+        <img src="${v.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none'">
+      </div>
+      <div class="item-info">
+        <div class="item-title">${v.title}</div>
+        <div class="item-date">${formatDate(v.publishedAt)}</div>
+      </div>
+      <div class="item-icons">
+        ${isStarred ? '<span class="item-icon">⭐</span>' : ''}
+        ${isSeen    ? '<span class="item-icon" style="color:var(--seen-color)">✓</span>' : ''}
+      </div>`;
+    item.addEventListener('click', () => {
+      currentIdx = idx; renderCurrent();
+      document.querySelector('[data-tab="player"]').click();
+    });
+    return item;
+  }
+
+  function renderStarredList() {
+    const list = videos.map((v,i) => ({v,i})).filter(({v}) => starred[v.id]);
+    starredCount.textContent = list.length + ' Videos';
+    if (!list.length) {
+      starredList.innerHTML = '<div class="empty-state"><div class="empty-icon">⭐</div>Noch keine Videos gemerkt.</div>';
+      return;
+    }
+    starredList.innerHTML = '';
+    list.forEach(({v,i}) => starredList.appendChild(makeListItem(v,i)));
+  }
+
+  function renderUnseenList() {
+    const list = videos.map((v,i) => ({v,i})).filter(({v}) => !seen[v.id]);
+    unseenCount.textContent = list.length + ' Videos';
+    if (!list.length) {
+      unseenList.innerHTML = '<div class="empty-state"><div class="empty-icon">🎉</div>Alle Videos gesehen!</div>';
+      return;
+    }
+    unseenList.innerHTML = '';
+    list.forEach(({v,i}) => unseenList.appendChild(makeListItem(v,i)));
+  }
+
+  // ── Reset ─────────────────────────────────────────────────────────────────
+  btnResetSeen.addEventListener('click', () => {
+    if (!confirm('Alle Gesehen-Markierungen löschen?')) return;
+    seen = {}; saveSeen(); renderCurrent(); showToast('Gesehen-Liste geleert');
+  });
+  btnResetStars.addEventListener('click', () => {
+    if (!confirm('Alle Merker löschen?')) return;
+    starred = {}; saveStarred(); renderCurrent(); showToast('Gemerkte geleert');
+  });
+
+  // ── Invidious API ─────────────────────────────────────────────────────────
+  async function tryInstance(instance) {
+    // Fetch up to 60 videos (pages of 20 — Invidious default)
+    let all  = [];
+    let page = 1;
+    while (all.length < 150) {
+      const url = `${instance}/api/v1/channels/${CHANNEL_ID}/videos?page=${page}&sort_by=newest`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const items = data.videos || [];
+      if (!items.length) break;
+      all = all.concat(items.map(v => ({
+        id:          v.videoId,
+        title:       v.title,
+        publishedAt: v.published ? new Date(v.published * 1000).toISOString() : '',
+        thumbnail:   `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`
+      })));
+      if (items.length < 20) break;
+      page++;
+    }
+    if (!all.length) throw new Error('Keine Videos');
+    return all;
+  }
+
+  async function fetchVideos() {
+    for (const inst of INSTANCES) {
+      try {
+        overlayMsg.textContent = `Versuche ${inst.replace('https://','')}…`;
+        const result = await tryInstance(inst);
+        activeInstance = inst;
+        activeInstanceEl.textContent = inst.replace('https://','');
+        return result;
+      } catch(e) {
+        // try next
+      }
+    }
+    throw new Error('Alle Invidious-Server nicht erreichbar. Bitte später erneut versuchen.');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init() {
+    load();
+    applySpeed(loadSpeed());
+    overlay.classList.remove('hidden');
+    spinner.style.display = '';
+    overlayMsg.textContent = 'Suche EverlastAI-Videos…';
+    errorBox.classList.remove('show');
+
+    try {
+      videos = await fetchVideos();
+      videosTotal.textContent = `${videos.length} Videos`;
+
+      const saved = loadIndex();
+      currentIdx = Math.min(saved, videos.length - 1);
+      renderCurrent();
+    } catch(err) {
+      overlay.classList.remove('hidden');
+      spinner.style.display = 'none';
+      overlayMsg.textContent = 'Fehler';
+      errorBox.classList.add('show');
+      errorMsg.textContent = err.message;
+      videosTotal.textContent = 'Fehler';
+    }
+  }
+
+  btnRetry.addEventListener('click', init);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
