@@ -320,7 +320,7 @@
 
 <!-- Tab bar -->
 <div class="tab-bar">
-  <button class="tab-btn active" data-tab="player"><span class="tab-icon">ℹ️</span>Info</button>
+  <button class="tab-btn active" data-tab="player"><span class="tab-icon">🏠</span>Start</button>
   <button class="tab-btn" data-tab="starred"><span class="tab-icon">⭐</span>Gemerkt</button>
   <button class="tab-btn" data-tab="unseen"><span class="tab-icon">👁</span>Ungesehen</button>
   <button class="tab-btn" data-tab="settings"><span class="tab-icon">⚙️</span>Info</button>
@@ -387,18 +387,8 @@
 (function () {
   'use strict';
 
-  // ── Channel ───────────────────────────────────────────────────────────────
-  const CHANNEL_ID = 'UC8T5gQ4U4GbI2h8kYCkEcvg';
-
-  // Invidious public instances — tried in order until one works
-  const INSTANCES = [
-    'https://invidious.io',
-    'https://inv.nadeko.net',
-    'https://invidious.nerdvpn.de',
-    'https://yewtu.be',
-    'https://vid.puffyan.us',
-    'https://invidious.slipfox.xyz',
-  ];
+  // API endpoint — Netlify Function proxies YouTube RSS server-side (no CORS)
+  const API_URL = '/.netlify/functions/videos';
 
   // ── Storage keys ──────────────────────────────────────────────────────────
   const KEY_SEEN    = 'everlastai_seen';
@@ -604,44 +594,17 @@
     starred = {}; saveStarred(); renderCurrent(); showToast('Gemerkte geleert');
   });
 
-  // ── Invidious API ─────────────────────────────────────────────────────────
-  async function tryInstance(instance) {
-    // Fetch up to 60 videos (pages of 20 — Invidious default)
-    let all  = [];
-    let page = 1;
-    while (all.length < 150) {
-      const url = `${instance}/api/v1/channels/${CHANNEL_ID}/videos?page=${page}&sort_by=newest`;
-      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-      const items = data.videos || [];
-      if (!items.length) break;
-      all = all.concat(items.map(v => ({
-        id:          v.videoId,
-        title:       v.title,
-        publishedAt: v.published ? new Date(v.published * 1000).toISOString() : '',
-        thumbnail:   `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`
-      })));
-      if (items.length < 20) break;
-      page++;
-    }
-    if (!all.length) throw new Error('Keine Videos');
-    return all;
-  }
-
+  // ── API ───────────────────────────────────────────────────────────────────
   async function fetchVideos() {
-    for (const inst of INSTANCES) {
-      try {
-        overlayMsg.textContent = `Versuche ${inst.replace('https://','')}…`;
-        const result = await tryInstance(inst);
-        activeInstance = inst;
-        activeInstanceEl.textContent = inst.replace('https://','');
-        return result;
-      } catch(e) {
-        // try next
-      }
-    }
-    throw new Error('Alle Invidious-Server nicht erreichbar. Bitte später erneut versuchen.');
+    overlayMsg.textContent = 'Lade Videos…';
+    const r = await fetch(API_URL, { signal: AbortSignal.timeout(12000) });
+    if (!r.ok) throw new Error(`Server-Fehler: HTTP ${r.status}`);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    if (!Array.isArray(data.videos) || !data.videos.length) throw new Error('Keine Videos gefunden.');
+    activeInstance = data.source || 'netlify';
+    activeInstanceEl.textContent = data.source || 'netlify-function';
+    return data.videos;
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
